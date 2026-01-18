@@ -104,7 +104,7 @@ export class LocationService {
       alerts.push({
         type: AlertType.GEOFENCE_EXIT,
         severity: AlertSeverity.CRITICAL,
-        message: `⚠️ ALERTE: ${vehicle.name} (${vehicle.registrationNumber}) est sorti de sa zone autorisée (${zoneNames}). Position: [${location.coordinates[1].toFixed(6)}, ${location.coordinates[0].toFixed(6)}]`,
+        message: `ALERTE: ${vehicle.name} (${vehicle.registrationNumber}) est sorti de sa zone autorisée (${zoneNames}). Position: [${location.coordinates[1].toFixed(6)}, ${location.coordinates[0].toFixed(6)}]`,
       });
     }
 
@@ -149,7 +149,7 @@ export class LocationService {
           alerts.push({
             type: AlertType.MOVEMENT_OUTSIDE_HOURS,
             severity: AlertSeverity.WARNING,
-            message: `🚨 Mouvement détecté pour ${vehicle.name} un jour non autorisé (${this.getDayName(currentDay)})`,
+            message: `Mouvement détecté pour ${vehicle.name} un jour non autorisé (${this.getDayName(currentDay)})`,
           });
           continue;
         }
@@ -165,7 +165,7 @@ export class LocationService {
           alerts.push({
             type: AlertType.MOVEMENT_OUTSIDE_HOURS,
             severity: AlertSeverity.CRITICAL,
-            message: `🚨 ALERTE: Mouvement de ${vehicle.name} détecté à ${currentTime} (horaires autorisés: ${geofence.allowedHours.start}-${geofence.allowedHours.end})`,
+            message: `ALERTE: Mouvement de ${vehicle.name} détecté à ${currentTime} (horaires autorisés: ${geofence.allowedHours.start}-${geofence.allowedHours.end})`,
           });
         }
       }
@@ -315,7 +315,7 @@ export class LocationService {
           status: AlertStatus.ACTIVE,
           vehicleId: vehicle._id,
           organizationId: vehicle.organizationId,
-          message: `🚨🚨 VOL POTENTIEL DÉTECTÉ: ${vehicle.name} (${vehicle.registrationNumber}) - Sortie de zone combinée à un mouvement hors horaires`,
+          message: `VOL POTENTIEL DÉTECTÉ: ${vehicle.name} (${vehicle.registrationNumber}) - Sortie de zone combinée à un mouvement hors horaires`,
           location: vehicle.location,
           triggeredAt: new Date(),
         });

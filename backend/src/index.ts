@@ -79,7 +79,7 @@ async function bootstrap(): Promise<void> {
   
   // Initialiser Socket.io
   const wsServer = initWebSocket(httpServer);
-  console.log('🔌 WebSocket server initialisé');
+  console.log('[WebSocket] Serveur initialisé');
 
   // ============================================
   // Démarrage du serveur
@@ -89,11 +89,11 @@ async function bootstrap(): Promise<void> {
     console.log(`
 ╔════════════════════════════════════════════════════════════╗
 ║                                                            ║
-║   🚜 SaaS BTP Telematics Server                            ║
+║   SaaS BTP Telematics Server                               ║
 ║                                                            ║
-║   📍 HTTP:      http://localhost:${config.port}                   ║
-║   🔌 WebSocket: ws://localhost:${config.port}                     ║
-║   🌍 Env:       ${config.nodeEnv.padEnd(15)}                      ║
+║   HTTP:      http://localhost:${config.port}                      ║
+║   WebSocket: ws://localhost:${config.port}                        ║
+║   Env:       ${config.nodeEnv.padEnd(15)}                         ║
 ║                                                            ║
 ╚════════════════════════════════════════════════════════════╝
     `);
@@ -114,7 +114,7 @@ async function bootstrap(): Promise<void> {
     
     // Fermer le serveur HTTP
     httpServer.close(() => {
-      console.log('👋 Serveur arrêté proprement');
+      console.log('[Server] Arrêté proprement');
       process.exit(0);
     });
 
@@ -131,6 +131,6 @@ async function bootstrap(): Promise<void> {
 
 // Lancement
 bootstrap().catch((error) => {
-  console.error('❌ Erreur fatale au démarrage:', error);
+  console.error('[Server] Erreur fatale au démarrage:', error);
   process.exit(1);
 });

@@ -58,7 +58,7 @@ function loadConfig(): Config {
   const result = configSchema.safeParse(rawConfig);
 
   if (!result.success) {
-    console.error('❌ Configuration invalide:');
+    console.error('[Config] Configuration invalide:');
     console.error(result.error.format());
     process.exit(1);
   }

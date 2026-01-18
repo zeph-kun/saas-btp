@@ -46,12 +46,12 @@ export class WebSocketServer {
    */
   private setupEventHandlers(): void {
     this.io.on('connection', (socket: Socket) => {
-      console.log(`🔌 Client connecté: ${socket.id}`);
+      console.log(`[WebSocket] Client connecté: ${socket.id}`);
 
       // Rejoindre la room de l'organisation
       socket.on('join:organization', (organizationId: string) => {
         socket.join(`org:${organizationId}`);
-        console.log(`📍 Socket ${socket.id} a rejoint org:${organizationId}`);
+        console.log(`[WebSocket] Socket ${socket.id} a rejoint org:${organizationId}`);
       });
 
       // Quitter la room
@@ -77,7 +77,7 @@ export class WebSocketServer {
 
       // Déconnexion
       socket.on('disconnect', (reason) => {
-        console.log(`👋 Client déconnecté: ${socket.id} (${reason})`);
+        console.log(`[WebSocket] Client déconnecté: ${socket.id} (${reason})`);
       });
     });
   }
@@ -130,7 +130,7 @@ export class WebSocketServer {
       // Vérifier si c'est un vol potentiel (combinaison de facteurs)
       const isTheft = await locationService.detectPotentialTheft(vehicleId, result.alerts);
       if (isTheft) {
-        console.log(`🚨🚨 VOL POTENTIEL DÉTECTÉ pour le véhicule ${vehicleId}`);
+        console.log(`[Alert] VOL POTENTIEL DETECTE pour le véhicule ${vehicleId}`);
       }
     }
   }

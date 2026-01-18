@@ -194,7 +194,7 @@ export class AuthController {
 
       // En production, envoyer le token par email
       // Pour le dev, on le retourne dans la réponse
-      console.log(`🔑 Token de reset pour ${email}: ${resetToken}`);
+      console.log(`[Auth] Token de reset pour ${email}: ${resetToken}`);
 
       res.json({
         success: true,

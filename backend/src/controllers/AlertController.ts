@@ -85,8 +85,8 @@ export class AlertController {
   async acknowledge(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { id } = req.params;
-      // L'userId viendrait du JWT/session
-      const userId = req.headers['x-user-id'] as string || 'demo-user-id';
+      // Utiliser l'utilisateur authentifié ou un ID de démo valide
+      const userId = req.user?._id?.toString() || '000000000000000000000001';
 
       const alert = await alertService.acknowledgeAlert(id, userId);
 
@@ -121,7 +121,8 @@ export class AlertController {
     try {
       const { id } = req.params;
       const { resolutionNotes } = req.body;
-      const userId = req.headers['x-user-id'] as string || 'demo-user-id';
+      // Utiliser l'utilisateur authentifié ou un ID de démo valide
+      const userId = req.user?._id?.toString() || '000000000000000000000001';
 
       const alert = await alertService.resolveAlert(id, userId, resolutionNotes);
 

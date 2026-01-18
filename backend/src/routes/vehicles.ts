@@ -34,13 +34,13 @@ router.get('/stats', vehicleController.getStats.bind(vehicleController));
 
 router.get(
   '/near',
-  validate(nearQuerySchema, 'query'),
+  validate(nearQuerySchema),
   vehicleController.findNear.bind(vehicleController)
 );
 
 router.get(
   '/',
-  validate(vehicleQuerySchema, 'query'),
+  validate(vehicleQuerySchema),
   vehicleController.getAll.bind(vehicleController)
 );
 

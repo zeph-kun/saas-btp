@@ -197,10 +197,10 @@ async function seed() {
   try {
     // Connexion à MongoDB
     await mongoose.connect(config.mongodb.uri);
-    console.log('✅ Connecté à MongoDB');
+    console.log('[Seed] Connecté à MongoDB');
 
     // Nettoyer les collections
-    console.log('🧹 Nettoyage des collections...');
+    console.log('[Seed] Nettoyage des collections...');
     await Promise.all([
       Vehicle.deleteMany({}),
       Geofence.deleteMany({}),
@@ -210,7 +210,7 @@ async function seed() {
     ]);
 
     // Créer les geofences
-    console.log('🗺️ Création des geofences...');
+    console.log('[Seed] Création des geofences...');
     const geofences = await Geofence.insertMany(
       geofencesData.map((g) => ({
         ...g,
@@ -221,7 +221,7 @@ async function seed() {
     console.log(`   ${geofences.length} geofences créées`);
 
     // Créer les véhicules
-    console.log('🚜 Création des véhicules...');
+    console.log('[Seed] Création des véhicules...');
     const vehicles = await Vehicle.insertMany(
       vehiclesData.map((v, i) => ({
         ...v,
@@ -243,7 +243,7 @@ async function seed() {
     }
 
     // Créer les clients
-    console.log('👥 Création des clients...');
+    console.log('[Seed] Création des clients...');
     const clients = await Client.insertMany(
       clientsData.map((c) => ({
         ...c,
@@ -253,7 +253,7 @@ async function seed() {
     console.log(`   ${clients.length} clients créés`);
 
     // Créer des contrats
-    console.log('📝 Création des contrats...');
+    console.log('[Seed] Création des contrats...');
     const contracts = await Contract.insertMany([
       {
         contractNumber: 'CTR-2026-001',
@@ -287,7 +287,7 @@ async function seed() {
     console.log(`   ${contracts.length} contrats créés`);
 
     // Créer quelques alertes de démonstration
-    console.log('🚨 Création des alertes de démonstration...');
+    console.log('[Seed] Création des alertes de démonstration...');
     const alerts = await Alert.insertMany([
       {
         type: AlertType.GEOFENCE_EXIT,
@@ -296,7 +296,7 @@ async function seed() {
         vehicleId: vehicles[0]._id,
         geofenceId: geofences[0]._id,
         organizationId: DEMO_ORG_ID,
-        message: `⚠️ ${vehicles[0].name} s'approche de la limite de zone`,
+        message: `${vehicles[0].name} s'approche de la limite de zone`,
         location: vehicles[0].location,
         triggeredAt: new Date(),
       },
@@ -306,7 +306,7 @@ async function seed() {
         status: AlertStatus.ACKNOWLEDGED,
         vehicleId: vehicles[3]._id,
         organizationId: DEMO_ORG_ID,
-        message: `🔋 Batterie faible sur ${vehicles[3].name}`,
+        message: `Batterie faible sur ${vehicles[3].name}`,
         location: vehicles[3].location,
         triggeredAt: new Date(Date.now() - 3600000), // 1h avant
         acknowledgedAt: new Date(),
@@ -315,7 +315,7 @@ async function seed() {
     console.log(`   ${alerts.length} alertes créées`);
 
     // Créer les utilisateurs de démonstration
-    console.log('👤 Création des utilisateurs de démonstration...');
+    console.log('[Seed] Création des utilisateurs de démonstration...');
     
     // Supprimer les utilisateurs et tokens existants
     await User.deleteMany({ organizationId: DEMO_ORG_ID });
@@ -352,8 +352,8 @@ async function seed() {
     ]);
     console.log(`   ${users.length} utilisateurs créés`);
 
-    console.log('\n✨ Seed terminé avec succès!');
-    console.log(`\n📊 Résumé:`);
+    console.log('\n[Seed] Terminé avec succès!');
+    console.log('\nRésumé:');
     console.log(`   - Organization ID: ${DEMO_ORG_ID}`);
     console.log(`   - ${vehicles.length} véhicules`);
     console.log(`   - ${geofences.length} geofences`);
@@ -362,16 +362,16 @@ async function seed() {
     console.log(`   - ${alerts.length} alertes`);
     console.log(`   - ${users.length} utilisateurs`);
     
-    console.log('\n🔑 Comptes de démonstration:');
+    console.log('\nComptes de démonstration:');
     console.log('   Admin:     admin@btploc.fr / Admin123!');
     console.log('   Manager:   manager@btploc.fr / Manager123!');
     console.log('   Opérateur: operateur@btploc.fr / Operateur123!');
 
   } catch (error) {
-    console.error('❌ Erreur lors du seed:', error);
+    console.error('[Seed] Erreur lors du seed:', error);
   } finally {
     await mongoose.disconnect();
-    console.log('\n👋 Déconnecté de MongoDB');
+    console.log('\n[Seed] Déconnecté de MongoDB');
   }
 }
 

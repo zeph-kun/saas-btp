@@ -11,7 +11,7 @@ export function errorHandler(
   res: Response,
   _next: NextFunction
 ): void {
-  console.error('❌ Erreur:', error);
+  console.error('[Error]', error);
 
   // Erreurs Mongoose de validation
   if (error.name === 'ValidationError') {

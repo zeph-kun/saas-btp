@@ -23,14 +23,14 @@ import { fr } from 'date-fns/locale';
 // ============================================
 
 const vehicleTypeLabels: Record<VehicleType, string> = {
-  [VehicleType.MINI_PELLE]: '🚜 Mini-pelle',
-  [VehicleType.CHARGEUSE]: '🚛 Chargeuse',
-  [VehicleType.TRACTOPELLE]: '🚧 Tractopelle',
-  [VehicleType.NACELLE]: '🏗️ Nacelle',
-  [VehicleType.COMPACTEUR]: '🔄 Compacteur',
-  [VehicleType.GROUPE_ELECTROGENE]: '⚡ Groupe électrogène',
-  [VehicleType.REMORQUE]: '🚚 Remorque',
-  [VehicleType.AUTRE]: '📦 Autre',
+  [VehicleType.MINI_PELLE]: 'Mini-pelle',
+  [VehicleType.CHARGEUSE]: 'Chargeuse',
+  [VehicleType.TRACTOPELLE]: 'Tractopelle',
+  [VehicleType.NACELLE]: 'Nacelle',
+  [VehicleType.COMPACTEUR]: 'Compacteur',
+  [VehicleType.GROUPE_ELECTROGENE]: 'Groupe électrogène',
+  [VehicleType.REMORQUE]: 'Remorque',
+  [VehicleType.AUTRE]: 'Autre',
 };
 
 const statusColors: Record<VehicleStatus, { bg: string; text: string }> = {

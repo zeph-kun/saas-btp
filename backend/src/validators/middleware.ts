@@ -4,16 +4,19 @@ import { ApiResponse } from '../types/index.js';
 
 /**
  * Middleware factory pour la validation des requêtes avec Zod
- * Supporte les schémas avec body, query, params ou un schéma simple
+ * Supporte les schémas avec body, query, params ou un schéma simple avec source explicite
  */
-export function validate<T>(schema: ZodSchema<T>) {
+export function validate<T>(
+  schema: ZodSchema<T>,
+  source: 'body' | 'query' | 'params' = 'body'
+) {
   return (req: Request, res: Response, next: NextFunction): void => {
     try {
       // Détecter si le schéma attend body/query/params ou des données directes
-      const schemaShape = (schema as ZodObject<ZodRawShape>).shape;
+      const schemaShape = (schema as unknown as ZodObject<ZodRawShape>).shape;
       
       if (schemaShape && ('body' in schemaShape || 'query' in schemaShape || 'params' in schemaShape)) {
-        // Schéma avec structure body/query/params
+        // Schéma avec structure body/query/params explicite
         const dataToValidate: Record<string, unknown> = {};
         if ('body' in schemaShape) dataToValidate.body = req.body;
         if ('query' in schemaShape) dataToValidate.query = req.query;
@@ -30,9 +33,17 @@ export function validate<T>(schema: ZodSchema<T>) {
         if (validated.query) (req as Request & { validatedQuery: unknown }).validatedQuery = validated.query;
         if (validated.params) (req as Request & { validatedParams: unknown }).validatedParams = validated.params;
       } else {
-        // Schéma simple pour body uniquement (rétrocompatibilité)
-        const validated = schema.parse(req.body);
-        req.body = validated;
+        // Schéma simple → utiliser le paramètre source
+        const data = source === 'body' ? req.body : source === 'query' ? req.query : req.params;
+        const validated = schema.parse(data);
+        
+        if (source === 'body') {
+          req.body = validated;
+        } else if (source === 'query') {
+          (req as Request & { validatedQuery: T }).validatedQuery = validated;
+        } else {
+          (req as Request & { validatedParams: T }).validatedParams = validated;
+        }
       }
       
       next();

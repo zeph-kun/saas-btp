@@ -19,7 +19,7 @@ const router = Router();
 
 router.get(
   '/containing-point',
-  validate(nearQuerySchema, 'query'),
+  validate(nearQuerySchema),
   geofenceController.findContainingPoint.bind(geofenceController)
 );
 

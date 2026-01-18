@@ -23,7 +23,7 @@ class Database {
    */
   public async connect(): Promise<void> {
     if (this.isConnected) {
-      console.log('📦 MongoDB déjà connecté');
+      console.log('[MongoDB] Déjà connecté');
       return;
     }
 
@@ -33,17 +33,17 @@ class Database {
       
       // Event listeners pour le monitoring
       mongoose.connection.on('connected', () => {
-        console.log('✅ MongoDB connecté avec succès');
+        console.log('[MongoDB] Connecté avec succès');
         this.isConnected = true;
       });
 
       mongoose.connection.on('error', (error) => {
-        console.error('❌ Erreur MongoDB:', error);
+        console.error('[MongoDB] Erreur:', error);
         this.isConnected = false;
       });
 
       mongoose.connection.on('disconnected', () => {
-        console.log('⚠️ MongoDB déconnecté');
+        console.log('[MongoDB] Déconnecté');
         this.isConnected = false;
       });
 
@@ -58,7 +58,7 @@ class Database {
       await this.ensureIndexes();
       
     } catch (error) {
-      console.error('❌ Impossible de se connecter à MongoDB:', error);
+      console.error('[MongoDB] Impossible de se connecter:', error);
       process.exit(1);
     }
   }
@@ -71,9 +71,9 @@ class Database {
     try {
       // Les index seront créés automatiquement par Mongoose
       // lors de la définition des schémas avec { index: '2dsphere' }
-      console.log('📍 Index géospatiaux vérifiés');
+      console.log('[MongoDB] Index géospatiaux vérifiés');
     } catch (error) {
-      console.error('❌ Erreur lors de la création des index:', error);
+      console.error('[MongoDB] Erreur lors de la création des index:', error);
     }
   }
 
@@ -88,9 +88,9 @@ class Database {
     try {
       await mongoose.connection.close();
       this.isConnected = false;
-      console.log('👋 MongoDB déconnecté proprement');
+      console.log('[MongoDB] Déconnecté proprement');
     } catch (error) {
-      console.error('❌ Erreur lors de la déconnexion:', error);
+      console.error('[MongoDB] Erreur lors de la déconnexion:', error);
       throw error;
     }
   }

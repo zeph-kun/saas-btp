@@ -36,17 +36,17 @@ class WebSocketService {
     });
 
     this.socket.on('connect', () => {
-      console.log('🔌 WebSocket connecté');
+      console.log('[WebSocket] Connecté');
       // Rejoindre la room de l'organisation
       this.socket?.emit('join:organization', organizationId);
     });
 
     this.socket.on('disconnect', (reason) => {
-      console.log('👋 WebSocket déconnecté:', reason);
+      console.log('[WebSocket] Déconnecté:', reason);
     });
 
     this.socket.on('connect_error', (error) => {
-      console.error('❌ Erreur de connexion WebSocket:', error);
+      console.error('[WebSocket] Erreur de connexion:', error);
     });
 
     // Écouter les mises à jour de position
@@ -56,7 +56,7 @@ class WebSocketService {
 
     // Écouter les nouvelles alertes
     this.socket.on('alert:new', (notification: AlertNotification) => {
-      console.log('🚨 Nouvelle alerte:', notification);
+      console.log('[Alert] Nouvelle alerte:', notification);
       this.newAlertHandlers.forEach((handler) => handler(notification));
     });
 
