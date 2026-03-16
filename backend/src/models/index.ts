@@ -1,4 +1,5 @@
 // Export de tous les modèles Mongoose
+export { Organization, IOrganizationDocument } from './Organization.js';
 export { Vehicle, IVehicleDocument, IVehicleModel } from './Vehicle.js';
 export { Geofence, IGeofenceDocument, IGeofenceModel } from './Geofence.js';
 export { Contract, IContractDocument } from './Contract.js';

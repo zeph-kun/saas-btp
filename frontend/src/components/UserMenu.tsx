@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { Truck, Users, FileText, UserCog } from 'lucide-react';
 import { useAuthStore } from '@/stores';
+import { Permission } from '@/types';
 
 /**
  * Menu utilisateur avec dropdown
@@ -126,6 +128,63 @@ export function UserMenu() {
               Paramètres
             </Link>
           </div>
+
+          {/* Section Navigation — liens conditionnels selon permissions/rôle */}
+          {(user.permissions.includes(Permission.VEHICLES_READ) ||
+            user.permissions.includes(Permission.CLIENTS_READ) ||
+            user.permissions.includes(Permission.CONTRACTS_READ) ||
+            user.role === 'admin' ||
+            user.role === 'super_admin') && (
+            <div className="border-t border-gray-100 py-1">
+              <p className="px-4 py-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                Navigation
+              </p>
+
+              {user.permissions.includes(Permission.VEHICLES_READ) && (
+                <Link
+                  to="/vehicles"
+                  onClick={() => setIsOpen(false)}
+                  className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                >
+                  <Truck className="h-5 w-5 mr-3 text-gray-400" />
+                  Véhicules
+                </Link>
+              )}
+
+              {user.permissions.includes(Permission.CLIENTS_READ) && (
+                <Link
+                  to="/clients"
+                  onClick={() => setIsOpen(false)}
+                  className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                >
+                  <Users className="h-5 w-5 mr-3 text-gray-400" />
+                  Clients
+                </Link>
+              )}
+
+              {user.permissions.includes(Permission.CONTRACTS_READ) && (
+                <Link
+                  to="/contracts"
+                  onClick={() => setIsOpen(false)}
+                  className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                >
+                  <FileText className="h-5 w-5 mr-3 text-gray-400" />
+                  Contrats
+                </Link>
+              )}
+
+              {(user.role === 'admin' || user.role === 'super_admin') && (
+                <Link
+                  to="/users"
+                  onClick={() => setIsOpen(false)}
+                  className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                >
+                  <UserCog className="h-5 w-5 mr-3 text-gray-400" />
+                  Utilisateurs
+                </Link>
+              )}
+            </div>
+          )}
 
           <div className="border-t border-gray-100 py-1">
             <button

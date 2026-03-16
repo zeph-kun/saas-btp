@@ -196,6 +196,35 @@ class ApiClient {
     const { data } = await this.client.get('/health');
     return data;
   }
+
+  // ============================================
+  // Méthodes HTTP génériques
+  // ============================================
+
+  async get<T>(url: string, config?: { params?: Record<string, unknown> }): Promise<{ data: T }> {
+    const { data } = await this.client.get<T>(url, config);
+    return { data };
+  }
+
+  async post<T>(url: string, body?: unknown): Promise<{ data: T }> {
+    const { data } = await this.client.post<T>(url, body);
+    return { data };
+  }
+
+  async put<T>(url: string, body?: unknown): Promise<{ data: T }> {
+    const { data } = await this.client.put<T>(url, body);
+    return { data };
+  }
+
+  async patch<T>(url: string, body?: unknown): Promise<{ data: T }> {
+    const { data } = await this.client.patch<T>(url, body);
+    return { data };
+  }
+
+  async delete<T>(url: string): Promise<{ data: T }> {
+    const { data } = await this.client.delete<T>(url);
+    return { data };
+  }
 }
 
 // Export d'une instance singleton

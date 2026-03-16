@@ -1,6 +1,18 @@
 import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { DashboardPage, LoginPage, ForgotPasswordPage, ResetPasswordPage } from '@/pages';
+import {
+  DashboardPage,
+  LoginPage,
+  RegisterPage,
+  ForgotPasswordPage,
+  ResetPasswordPage,
+  ProfilePage,
+  SettingsPage,
+  UsersPage,
+  VehiclesPage,
+  ClientsPage,
+  ContractsPage,
+} from '@/pages';
 import { AlertNotificationProvider, ProtectedRoute } from '@/components';
 import { initializeWebSocket, useAuthStore } from '@/stores';
 
@@ -18,9 +30,10 @@ function AppRoutes() {
     <Routes>
       {/* Routes publiques */}
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/register" element={<RegisterPage />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
-      
+
       {/* Routes protégées */}
       <Route
         path="/"
@@ -30,8 +43,56 @@ function AppRoutes() {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/profile"
+        element={
+          <ProtectedRoute>
+            <ProfilePage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/settings"
+        element={
+          <ProtectedRoute>
+            <SettingsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/users"
+        element={
+          <ProtectedRoute>
+            <UsersPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/vehicles"
+        element={
+          <ProtectedRoute>
+            <VehiclesPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/clients"
+        element={
+          <ProtectedRoute>
+            <ClientsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/contracts"
+        element={
+          <ProtectedRoute>
+            <ContractsPage />
+          </ProtectedRoute>
+        }
+      />
       <Route path="/dashboard" element={<Navigate to="/" replace />} />
-      
+
       {/* Redirection par défaut */}
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

@@ -1,4 +1,11 @@
 export { DashboardPage } from './DashboardPage';
 export { LoginPage } from './LoginPage';
+export { RegisterPage } from './RegisterPage';
 export { ForgotPasswordPage } from './ForgotPasswordPage';
 export { ResetPasswordPage } from './ResetPasswordPage';
+export { ProfilePage } from './ProfilePage';
+export { SettingsPage } from './SettingsPage';
+export { UsersPage } from './UsersPage';
+export { VehiclesPage } from './VehiclesPage';
+export { ClientsPage } from './ClientsPage';
+export { ContractsPage } from './ContractsPage';

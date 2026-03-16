@@ -2,6 +2,7 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { Types } from 'mongoose';
 import { User, IUserDocument, UserRole, Permission } from '../models/User.js';
+import { Organization } from '../models/Organization.js';
 import { RefreshToken } from '../models/RefreshToken.js';
 import config from '../config/index.js';
 
@@ -28,6 +29,8 @@ export interface AuthResult {
 
 /**
  * Données pour l'inscription
+ * `organizationId` est optionnel : s'il est absent, une nouvelle organisation
+ * est créée automatiquement (flux d'auto-inscription publique).
  */
 export interface RegisterData {
   email: string;
@@ -35,7 +38,7 @@ export interface RegisterData {
   firstName: string;
   lastName: string;
   role?: UserRole;
-  organizationId: string;
+  organizationId?: string;
 }
 
 /**
@@ -47,13 +50,32 @@ export class AuthService {
   private readonly refreshTokenExpiryDays = 7;
 
   /**
-   * Inscrit un nouvel utilisateur
+   * Inscrit un nouvel utilisateur.
+   *
+   * Flux auto-inscription (sans `organizationId`) :
+   *   1. Crée une Organisation avec le nom "{firstName} {lastName} - Organisation"
+   *   2. Utilise l'`_id` de cette organisation pour l'utilisateur
+   *
+   * Flux invitation (avec `organizationId`) :
+   *   Rattache directement l'utilisateur à l'organisation existante.
    */
   async register(data: RegisterData): Promise<AuthResult> {
     // Vérifier si l'email existe déjà
     const existingUser = await User.findOne({ email: data.email.toLowerCase() });
     if (existingUser) {
       throw new Error('Un utilisateur avec cet email existe déjà');
+    }
+
+    // Résoudre l'organisationId : créer une nouvelle org si absent
+    let resolvedOrganizationId: Types.ObjectId;
+
+    if (data.organizationId) {
+      resolvedOrganizationId = new Types.ObjectId(data.organizationId);
+    } else {
+      // Auto-inscription : créer une organisation dédiée
+      const orgName = `${data.firstName} ${data.lastName} - Organisation`;
+      const newOrg = await Organization.create({ name: orgName });
+      resolvedOrganizationId = newOrg._id;
     }
 
     // Créer l'utilisateur
@@ -63,7 +85,7 @@ export class AuthService {
       firstName: data.firstName,
       lastName: data.lastName,
       role: data.role || UserRole.OPERATOR,
-      organizationId: new Types.ObjectId(data.organizationId),
+      organizationId: resolvedOrganizationId,
     });
 
     // Générer les tokens

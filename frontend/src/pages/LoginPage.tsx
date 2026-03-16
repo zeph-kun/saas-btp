@@ -147,6 +147,19 @@ export function LoginPage() {
               )}
             </button>
           </div>
+
+          {/* Lien vers l'inscription */}
+          <div className="text-center">
+            <p className="text-sm text-gray-600">
+              Pas encore de compte ?{' '}
+              <Link
+                to="/register"
+                className="font-medium text-blue-600 hover:text-blue-500"
+              >
+                Créer un compte
+              </Link>
+            </p>
+          </div>
         </form>
 
         {/* Comptes de démo */}
