@@ -19,6 +19,8 @@ import {
   Edit3,
   Save,
   AlertCircle,
+  Smartphone,
+  Copy,
 } from 'lucide-react';
 
 // ============================================
@@ -470,6 +472,265 @@ function TabInfos() {
 }
 
 // ============================================
+// Composant MFA
+// ============================================
+
+type MfaStep = 'idle' | 'setup' | 'verify' | 'backup' | 'disable';
+
+function MfaSection() {
+  const { user, refreshUser } = useAuthStore();
+  const [step, setStep] = useState<MfaStep>('idle');
+  const [qrCode, setQrCode] = useState('');
+  const [secret, setSecret] = useState('');
+  const [totpCode, setTotpCode] = useState('');
+  const [backupCodes, setBackupCodes] = useState<string[]>([]);
+  const [disablePassword, setDisablePassword] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  if (!user) return null;
+
+  const handleStartSetup = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const result = await authService.mfaSetup();
+      setQrCode(result.qrCodeDataUrl);
+      setSecret(result.secret);
+      setStep('setup');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur lors du setup');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleVerify = async (e: FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError(null);
+    try {
+      const result = await authService.mfaEnable(totpCode);
+      setBackupCodes(result.backupCodes);
+      setStep('backup');
+      await refreshUser();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Code invalide');
+    } finally {
+      setIsLoading(false);
+      setTotpCode('');
+    }
+  };
+
+  const handleDisable = async (e: FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError(null);
+    try {
+      await authService.mfaDisable(disablePassword);
+      await refreshUser();
+      setStep('idle');
+      setSuccessMsg('Authentification à deux facteurs désactivée');
+      setTimeout(() => setSuccessMsg(null), 3000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur');
+    } finally {
+      setIsLoading(false);
+      setDisablePassword('');
+    }
+  };
+
+  const handleFinishSetup = () => {
+    setStep('idle');
+    setQrCode('');
+    setSecret('');
+    setBackupCodes([]);
+    setSuccessMsg('Authentification à deux facteurs activée');
+    setTimeout(() => setSuccessMsg(null), 3000);
+  };
+
+  const copyBackupCodes = () => {
+    navigator.clipboard.writeText(backupCodes.join('\n'));
+  };
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-gray-200">
+      <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-2">
+        <Smartphone className="w-5 h-5 text-gray-500" />
+        <h2 className="text-base font-semibold text-gray-900">Authentification à deux facteurs (TOTP)</h2>
+      </div>
+
+      <div className="px-6 py-5">
+        {successMsg && (
+          <div className="flex items-center gap-2 px-4 py-3 mb-4 bg-green-50 border border-green-200 rounded-lg text-green-700 text-sm">
+            <Check className="w-4 h-4 shrink-0" />
+            {successMsg}
+          </div>
+        )}
+
+        {error && (
+          <div className="flex items-center gap-2 px-4 py-3 mb-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+            <AlertCircle className="w-4 h-4 shrink-0" />
+            {error}
+          </div>
+        )}
+
+        {/* État idle */}
+        {step === 'idle' && (
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-700">
+                Statut :{' '}
+                <span className={user.mfaEnabled ? 'text-green-600 font-medium' : 'text-gray-500'}>
+                  {user.mfaEnabled ? 'Activé' : 'Désactivé'}
+                </span>
+              </p>
+              <p className="text-xs text-gray-500 mt-1">
+                {user.mfaEnabled
+                  ? 'Un code TOTP est demandé à chaque connexion.'
+                  : 'Ajoutez une couche de sécurité avec une application d\'authentification (Google Authenticator, Authy, etc.).'}
+              </p>
+            </div>
+            {user.mfaEnabled ? (
+              <button
+                onClick={() => { setStep('disable'); setError(null); }}
+                className="px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50 rounded-lg border border-red-200 transition-colors"
+              >
+                Désactiver
+              </button>
+            ) : (
+              <button
+                onClick={handleStartSetup}
+                disabled={isLoading}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg disabled:opacity-50 transition-colors"
+              >
+                {isLoading ? 'Chargement...' : 'Activer'}
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Étape 1 : QR Code */}
+        {step === 'setup' && (
+          <div className="space-y-4">
+            <p className="text-sm text-gray-700">
+              Scannez ce QR code avec votre application d'authentification :
+            </p>
+            <div className="flex justify-center">
+              <img src={qrCode} alt="QR Code TOTP" className="w-48 h-48" />
+            </div>
+            <div className="text-center">
+              <p className="text-xs text-gray-500 mb-1">Ou entrez cette clé manuellement :</p>
+              <code className="text-sm bg-gray-100 px-3 py-1.5 rounded font-mono select-all">
+                {secret}
+              </code>
+            </div>
+            <form onSubmit={handleVerify} className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Code de vérification
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  value={totpCode}
+                  onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  className="block w-full px-3 py-2 border rounded-lg text-center text-lg font-mono tracking-widest focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="000000"
+                />
+              </div>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => { setStep('idle'); setError(null); }}
+                  className="flex-1 px-4 py-2 text-sm border rounded-lg text-gray-700 hover:bg-gray-50"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="submit"
+                  disabled={isLoading || totpCode.length !== 6}
+                  className="flex-1 px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {isLoading ? 'Vérification...' : 'Activer le MFA'}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* Étape 2 : Codes de secours */}
+        {step === 'backup' && (
+          <div className="space-y-4">
+            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <p className="text-sm font-medium text-yellow-800">
+                Conservez ces codes de secours en lieu sûr.
+              </p>
+              <p className="text-xs text-yellow-700 mt-1">
+                Chaque code ne peut être utilisé qu'une seule fois si vous perdez l'accès à votre application d'authentification.
+              </p>
+            </div>
+            <div className="bg-gray-50 rounded-lg p-4 font-mono text-sm text-center space-y-1">
+              {backupCodes.map((code, i) => (
+                <div key={i} className="text-gray-800">{code}</div>
+              ))}
+            </div>
+            <button
+              onClick={copyBackupCodes}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2 text-sm border rounded-lg text-gray-700 hover:bg-gray-50"
+            >
+              <Copy className="w-4 h-4" />
+              Copier les codes
+            </button>
+            <button
+              onClick={handleFinishSetup}
+              className="w-full px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            >
+              J'ai sauvegardé mes codes
+            </button>
+          </div>
+        )}
+
+        {/* Désactivation */}
+        {step === 'disable' && (
+          <form onSubmit={handleDisable} className="space-y-4">
+            <p className="text-sm text-gray-700">
+              Entrez votre mot de passe pour confirmer la désactivation du MFA.
+            </p>
+            <input
+              type="password"
+              value={disablePassword}
+              onChange={(e) => setDisablePassword(e.target.value)}
+              autoComplete="current-password"
+              className="block w-full px-3 py-2 border rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="Mot de passe"
+            />
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => { setStep('idle'); setError(null); }}
+                className="flex-1 px-4 py-2 text-sm border rounded-lg text-gray-700 hover:bg-gray-50"
+              >
+                Annuler
+              </button>
+              <button
+                type="submit"
+                disabled={isLoading || !disablePassword}
+                className="flex-1 px-4 py-2 text-sm bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+              >
+                {isLoading ? 'Désactivation...' : 'Confirmer'}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ============================================
 // Onglet 2 : Sécurité
 // ============================================
 
@@ -628,6 +889,9 @@ function TabSecurity() {
           </div>
         </form>
       </div>
+
+      {/* ── Section : Authentification à deux facteurs ── */}
+      <MfaSection />
 
       {/* ── Section : permissions ── */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200">

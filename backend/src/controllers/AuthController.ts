@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { authService } from '../services/AuthService.js';
+import { authService, MfaPendingResult } from '../services/AuthService.js';
 import { User, UserRole } from '../models/User.js';
 import { ApiResponse } from '../types/index.js';
 import config from '../config/index.js';
@@ -102,18 +102,29 @@ export class AuthController {
 
       const result = await authService.login(email, password, metadata);
 
+      // Si MFA requis, retourner le token temporaire
+      if ('mfaRequired' in result) {
+        const mfaResult = result as MfaPendingResult;
+        res.json({
+          success: true,
+          data: {
+            mfaRequired: true,
+            mfaToken: mfaResult.mfaToken,
+          },
+        });
+        return;
+      }
+
       setRefreshTokenCookie(res, result.refreshToken);
 
-      const response: ApiResponse<{ user: typeof result.user; accessToken: string; expiresIn: number }> = {
+      res.json({
         success: true,
         data: {
           user: result.user,
           accessToken: result.accessToken,
           expiresIn: result.expiresIn,
         },
-      };
-
-      res.json(response);
+      } satisfies ApiResponse<unknown>);
     } catch (error) {
       res.status(401).json({
         success: false,
@@ -341,6 +352,115 @@ export class AuthController {
           message: error instanceof Error ? error.message : 'Erreur lors du changement de mot de passe',
         },
       });
+    }
+  }
+
+  // ============================================
+  // MFA / TOTP
+  // ============================================
+
+  /**
+   * POST /api/auth/mfa/setup
+   * Génère le secret TOTP et retourne le QR code
+   */
+  async mfaSetup(req: Request, res: Response, _next: NextFunction): Promise<void> {
+    try {
+      if (!req.user) {
+        res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Authentification requise' } });
+        return;
+      }
+
+      const result = await authService.setupMfa(req.user._id.toString());
+
+      res.json({
+        success: true,
+        data: {
+          qrCodeDataUrl: result.qrCodeDataUrl,
+          secret: result.secret,
+        },
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erreur lors du setup MFA';
+      res.status(400).json({ success: false, error: { code: 'MFA_SETUP_ERROR', message } });
+    }
+  }
+
+  /**
+   * POST /api/auth/mfa/enable
+   * Valide le code TOTP et active le MFA. Retourne les codes de secours.
+   */
+  async mfaEnable(req: Request, res: Response, _next: NextFunction): Promise<void> {
+    try {
+      if (!req.user) {
+        res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Authentification requise' } });
+        return;
+      }
+
+      const { token } = req.body;
+      const backupCodes = await authService.enableMfa(req.user._id.toString(), token);
+
+      res.json({
+        success: true,
+        data: { backupCodes },
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erreur lors de l\'activation MFA';
+      res.status(400).json({ success: false, error: { code: 'MFA_ENABLE_ERROR', message } });
+    }
+  }
+
+  /**
+   * POST /api/auth/mfa/disable
+   * Désactive le MFA (requiert le mot de passe)
+   */
+  async mfaDisable(req: Request, res: Response, _next: NextFunction): Promise<void> {
+    try {
+      if (!req.user) {
+        res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Authentification requise' } });
+        return;
+      }
+
+      const { password } = req.body;
+      await authService.disableMfa(req.user._id.toString(), password);
+
+      res.json({
+        success: true,
+        data: { message: 'MFA désactivé' },
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Erreur lors de la désactivation MFA';
+      res.status(400).json({ success: false, error: { code: 'MFA_DISABLE_ERROR', message } });
+    }
+  }
+
+  /**
+   * POST /api/auth/mfa/verify
+   * Vérifie le code TOTP pendant le login et retourne les tokens d'accès
+   */
+  async mfaVerify(req: Request, res: Response, _next: NextFunction): Promise<void> {
+    try {
+      const { mfaToken, code } = req.body;
+
+      const metadata = {
+        userAgent: req.headers['user-agent'],
+        ipAddress: req.ip || req.connection.remoteAddress,
+      };
+
+      const result = await authService.verifyMfa(mfaToken, code, metadata);
+
+      setRefreshTokenCookie(res, result.refreshToken);
+
+      res.json({
+        success: true,
+        data: {
+          user: result.user,
+          accessToken: result.accessToken,
+          expiresIn: result.expiresIn,
+        },
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Code MFA invalide';
+      res.status(401).json({ success: false, error: { code: 'MFA_VERIFY_ERROR', message } });
     }
   }
 

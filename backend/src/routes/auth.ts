@@ -118,6 +118,20 @@ router.post(
   authController.changePassword
 );
 
+// ── MFA / TOTP ──
+
+// POST /api/auth/mfa/verify - Vérifier le code TOTP pendant le login (public)
+router.post('/mfa/verify', authController.mfaVerify);
+
+// POST /api/auth/mfa/setup - Générer le QR code pour setup MFA
+router.post('/mfa/setup', authenticate, authController.mfaSetup);
+
+// POST /api/auth/mfa/enable - Activer le MFA après vérification du code
+router.post('/mfa/enable', authenticate, authController.mfaEnable);
+
+// POST /api/auth/mfa/disable - Désactiver le MFA
+router.post('/mfa/disable', authenticate, authController.mfaDisable);
+
 // GET /api/auth/me - Informations de l'utilisateur connecté
 router.get('/me', authenticate, authController.me);
 

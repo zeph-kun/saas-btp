@@ -275,6 +275,7 @@ export interface User {
   permissions: Permission[];
   organizationId: string;
   isActive: boolean;
+  mfaEnabled: boolean;
   lastLoginAt?: string;
   createdAt: string;
   updatedAt: string;
@@ -308,4 +309,22 @@ export interface RegisterRequest {
 export interface ChangePasswordRequest {
   currentPassword: string;
   newPassword: string;
+}
+
+// ============================================
+// Types MFA / TOTP
+// ============================================
+
+export interface MfaPendingResponse {
+  mfaRequired: true;
+  mfaToken: string;
+}
+
+export interface MfaSetupResponse {
+  qrCodeDataUrl: string;
+  secret: string;
+}
+
+export interface MfaEnableResponse {
+  backupCodes: string[];
 }

@@ -1,4 +1,4 @@
-import { useState, FormEvent } from 'react';
+import { useState, useRef, useEffect, FormEvent } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '@/stores';
 
@@ -7,11 +7,20 @@ import { useAuthStore } from '@/stores';
  */
 export function LoginPage() {
   const navigate = useNavigate();
-  const { login, isLoading, error, clearError } = useAuthStore();
-  
+  const { login, verifyMfa, isLoading, error, clearError, mfaPending, clearMfaPending } = useAuthStore();
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [mfaCode, setMfaCode] = useState('');
+  const mfaInputRef = useRef<HTMLInputElement>(null);
+
+  // Focus sur l'input MFA quand il apparaît
+  useEffect(() => {
+    if (mfaPending) {
+      mfaInputRef.current?.focus();
+    }
+  }, [mfaPending]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -19,10 +28,31 @@ export function LoginPage() {
 
     try {
       await login({ email, password });
-      navigate('/');
+      // Si pas de MFA, on navigue. Si MFA, le store met mfaPending.
+      if (!useAuthStore.getState().mfaPending) {
+        navigate('/');
+      }
     } catch {
       // L'erreur est gérée dans le store
     }
+  };
+
+  const handleMfaSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    clearError();
+
+    try {
+      await verifyMfa(mfaCode);
+      navigate('/');
+    } catch {
+      setMfaCode('');
+    }
+  };
+
+  const handleBackToLogin = () => {
+    clearMfaPending();
+    setMfaCode('');
+    setPassword('');
   };
 
   return (
@@ -55,7 +85,65 @@ export function LoginPage() {
           </p>
         </div>
 
-        {/* Formulaire */}
+        {/* Formulaire MFA */}
+        {mfaPending ? (
+          <form className="mt-8 space-y-6" onSubmit={handleMfaSubmit}>
+            <div className="text-center">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-blue-100 mb-4">
+                <svg className="w-8 h-8 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900">Vérification en deux étapes</h3>
+              <p className="text-sm text-gray-500 mt-1">
+                Entrez le code à 6 chiffres de votre application d'authentification, ou un code de secours.
+              </p>
+            </div>
+
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+                <p className="text-sm">{error}</p>
+              </div>
+            )}
+
+            <div>
+              <input
+                ref={mfaInputRef}
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                value={mfaCode}
+                onChange={(e) => setMfaCode(e.target.value.replace(/[^0-9A-Fa-f]/g, '').slice(0, 8))}
+                className="block w-full px-4 py-3 border border-gray-300 rounded-lg text-center text-2xl font-mono tracking-[0.5em] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                placeholder="000000"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={isLoading || mfaCode.length < 6}
+              className="w-full flex justify-center py-2.5 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {isLoading ? (
+                <svg className="animate-spin h-5 w-5 text-white" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+              ) : (
+                'Vérifier'
+              )}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleBackToLogin}
+              className="w-full text-sm text-gray-500 hover:text-gray-700"
+            >
+              Retour à la connexion
+            </button>
+          </form>
+        ) : (
+        /* Formulaire de connexion classique */
         <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
           {/* Erreur */}
           {error && (
@@ -161,6 +249,7 @@ export function LoginPage() {
             </p>
           </div>
         </form>
+        )}
 
         {/* Comptes de démo */}
         <div className="mt-6 bg-gray-50 rounded-lg p-4">

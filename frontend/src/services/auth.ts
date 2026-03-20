@@ -6,6 +6,9 @@ import {
   LoginRequest,
   RegisterRequest,
   ChangePasswordRequest,
+  MfaPendingResponse,
+  MfaSetupResponse,
+  MfaEnableResponse,
 } from '@/types';
 
 // Clés de stockage local (seul l'access token et le user restent en localStorage)
@@ -72,17 +75,34 @@ class AuthService {
   // API d'authentification
   // ============================================
 
-  async login(credentials: LoginRequest): Promise<AuthResponse> {
-    const { data } = await this.client.post<ApiResponse<AuthResponse>>('/login', credentials);
+  async login(credentials: LoginRequest): Promise<AuthResponse | MfaPendingResponse> {
+    const { data } = await this.client.post<ApiResponse<AuthResponse | MfaPendingResponse>>('/login', credentials);
 
     if (data.success && data.data) {
-      const { accessToken, user } = data.data;
-      this.setAccessToken(accessToken);
-      this.setStoredUser(user);
-      return data.data;
+      // Si MFA requis, retourner tel quel (pas de tokens à stocker)
+      if ('mfaRequired' in data.data) {
+        return data.data as MfaPendingResponse;
+      }
+
+      const authData = data.data as AuthResponse;
+      this.setAccessToken(authData.accessToken);
+      this.setStoredUser(authData.user);
+      return authData;
     }
 
     throw new Error(data.error?.message || 'Erreur de connexion');
+  }
+
+  async verifyMfa(mfaToken: string, code: string): Promise<AuthResponse> {
+    const { data } = await this.client.post<ApiResponse<AuthResponse>>('/mfa/verify', { mfaToken, code });
+
+    if (data.success && data.data) {
+      this.setAccessToken(data.data.accessToken);
+      this.setStoredUser(data.data.user);
+      return data.data;
+    }
+
+    throw new Error(data.error?.message || 'Code MFA invalide');
   }
 
   async register(userData: RegisterRequest): Promise<AuthResponse> {
@@ -186,6 +206,42 @@ class AuthService {
     if (!data.success) {
       throw new Error(data.error?.message || 'Erreur lors du changement de mot de passe');
     }
+  }
+
+  // ============================================
+  // MFA
+  // ============================================
+
+  async mfaSetup(): Promise<MfaSetupResponse> {
+    const accessToken = this.getAccessToken();
+    const { data } = await this.client.post<ApiResponse<MfaSetupResponse>>(
+      '/mfa/setup',
+      {},
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    if (data.success && data.data) return data.data;
+    throw new Error(data.error?.message || 'Erreur lors du setup MFA');
+  }
+
+  async mfaEnable(token: string): Promise<MfaEnableResponse> {
+    const accessToken = this.getAccessToken();
+    const { data } = await this.client.post<ApiResponse<MfaEnableResponse>>(
+      '/mfa/enable',
+      { token },
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    if (data.success && data.data) return data.data;
+    throw new Error(data.error?.message || 'Erreur lors de l\'activation MFA');
+  }
+
+  async mfaDisable(password: string): Promise<void> {
+    const accessToken = this.getAccessToken();
+    const { data } = await this.client.post<ApiResponse<{ message: string }>>(
+      '/mfa/disable',
+      { password },
+      { headers: { Authorization: `Bearer ${accessToken}` } }
+    );
+    if (!data.success) throw new Error(data.error?.message || 'Erreur lors de la désactivation MFA');
   }
 
   async getProfile(): Promise<User> {

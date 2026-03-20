@@ -13,6 +13,7 @@ import {
   LoginRequest,
   RegisterRequest,
   Permission,
+  MfaPendingResponse,
 } from '@/types';
 
 // ============================================
@@ -24,9 +25,12 @@ interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
+  mfaPending: MfaPendingResponse | null;
 
   // Actions
   login: (credentials: LoginRequest) => Promise<void>;
+  verifyMfa: (code: string) => Promise<void>;
+  clearMfaPending: () => void;
   register: (userData: RegisterRequest) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -40,17 +44,24 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isAuthenticated: authService.isAuthenticated(),
   isLoading: false,
   error: null,
+  mfaPending: null,
 
   login: async (credentials) => {
-    set({ isLoading: true, error: null });
+    set({ isLoading: true, error: null, mfaPending: null });
     try {
       const response = await authService.login(credentials);
+
+      // Si MFA requis, stocker le token temporaire
+      if ('mfaRequired' in response) {
+        set({ mfaPending: response as MfaPendingResponse, isLoading: false });
+        return;
+      }
+
       set({
         user: response.user,
         isAuthenticated: true,
         isLoading: false,
       });
-      // Initialiser la connexion WebSocket après login
       initializeWebSocket(response.user.organizationId);
     } catch (error) {
       set({
@@ -60,6 +71,31 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       throw error;
     }
   },
+
+  verifyMfa: async (code) => {
+    const { mfaPending } = get();
+    if (!mfaPending) throw new Error('Pas de MFA en attente');
+
+    set({ isLoading: true, error: null });
+    try {
+      const response = await authService.verifyMfa(mfaPending.mfaToken, code);
+      set({
+        user: response.user,
+        isAuthenticated: true,
+        isLoading: false,
+        mfaPending: null,
+      });
+      initializeWebSocket(response.user.organizationId);
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : 'Code MFA invalide',
+        isLoading: false,
+      });
+      throw error;
+    }
+  },
+
+  clearMfaPending: () => set({ mfaPending: null, error: null }),
 
   register: async (userData) => {
     set({ isLoading: true, error: null });

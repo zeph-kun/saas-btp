@@ -1,6 +1,8 @@
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { Types } from 'mongoose';
+import * as OTPAuth from 'otpauth';
+import QRCode from 'qrcode';
 import { User, IUserDocument, UserRole, Permission } from '../models/User.js';
 import { Organization } from '../models/Organization.js';
 import { RefreshToken } from '../models/RefreshToken.js';
@@ -26,6 +28,27 @@ export interface AuthResult {
   refreshToken: string;
   expiresIn: number;
 }
+
+/**
+ * Résultat login quand MFA est requis
+ */
+export interface MfaPendingResult {
+  mfaRequired: true;
+  mfaToken: string;
+}
+
+/**
+ * Résultat du setup MFA
+ */
+export interface MfaSetupResult {
+  secret: string;
+  qrCodeDataUrl: string;
+  otpauthUrl: string;
+}
+
+const MFA_TOKEN_EXPIRY = '5m';
+const MFA_ISSUER = 'BTP Location';
+const BACKUP_CODES_COUNT = 8;
 
 /**
  * Données pour l'inscription
@@ -93,13 +116,14 @@ export class AuthService {
   }
 
   /**
-   * Connecte un utilisateur
+   * Connecte un utilisateur.
+   * Si MFA est activé, retourne un token temporaire au lieu des tokens d'accès.
    */
   async login(
     email: string,
     password: string,
     metadata?: { userAgent?: string; ipAddress?: string }
-  ): Promise<AuthResult> {
+  ): Promise<AuthResult | MfaPendingResult> {
     // Trouver l'utilisateur avec le mot de passe
     const user = await User.findOne({ email: email.toLowerCase() })
       .select('+password')
@@ -118,6 +142,16 @@ export class AuthService {
     const isPasswordValid = await user.comparePassword(password);
     if (!isPasswordValid) {
       throw new Error('Email ou mot de passe incorrect');
+    }
+
+    // Si MFA activé, retourner un token temporaire pour la vérification TOTP
+    if (user.mfaEnabled) {
+      const mfaToken = jwt.sign(
+        { userId: user._id.toString(), purpose: 'mfa' },
+        config.jwt.secret,
+        { expiresIn: MFA_TOKEN_EXPIRY }
+      );
+      return { mfaRequired: true, mfaToken };
     }
 
     // Mettre à jour la date de dernière connexion
@@ -254,6 +288,150 @@ export class AuthService {
 
     // Révoquer tous les refresh tokens sauf celui actuel (optionnel)
     await RefreshToken.revokeAllForUser(user._id);
+  }
+
+  // ============================================
+  // MFA / TOTP
+  // ============================================
+
+  /**
+   * Génère un secret TOTP et retourne le QR code pour le setup
+   */
+  async setupMfa(userId: string): Promise<MfaSetupResult> {
+    const user = await User.findById(userId);
+    if (!user) throw new Error('Utilisateur non trouvé');
+    if (user.mfaEnabled) throw new Error('Le MFA est déjà activé');
+
+    const secret = new OTPAuth.Secret({ size: 20 });
+    const totp = new OTPAuth.TOTP({
+      issuer: MFA_ISSUER,
+      label: user.email,
+      algorithm: 'SHA1',
+      digits: 6,
+      period: 30,
+      secret,
+    });
+
+    const otpauthUrl = totp.toString();
+    const qrCodeDataUrl = await QRCode.toDataURL(otpauthUrl);
+
+    // Stocker temporairement le secret (pas encore activé)
+    user.mfaSecret = secret.base32;
+    await user.save({ validateBeforeSave: false });
+
+    return { secret: secret.base32, qrCodeDataUrl, otpauthUrl };
+  }
+
+  /**
+   * Valide le code TOTP et active le MFA. Retourne les codes de secours.
+   */
+  async enableMfa(userId: string, token: string): Promise<string[]> {
+    const user = await User.findById(userId).select('+mfaSecret');
+    if (!user) throw new Error('Utilisateur non trouvé');
+    if (user.mfaEnabled) throw new Error('Le MFA est déjà activé');
+    if (!user.mfaSecret) throw new Error('Aucun setup MFA en cours. Appelez /mfa/setup d\'abord');
+
+    const isValid = this.verifyTotpToken(user.mfaSecret, token);
+    if (!isValid) throw new Error('Code TOTP invalide');
+
+    // Générer les codes de secours
+    const backupCodes = Array.from({ length: BACKUP_CODES_COUNT }, () =>
+      crypto.randomBytes(4).toString('hex').toUpperCase()
+    );
+
+    // Hasher les codes avant stockage
+    const hashedCodes = backupCodes.map((code) =>
+      crypto.createHash('sha256').update(code).digest('hex')
+    );
+
+    user.mfaEnabled = true;
+    user.mfaBackupCodes = hashedCodes;
+    await user.save({ validateBeforeSave: false });
+
+    return backupCodes;
+  }
+
+  /**
+   * Désactive le MFA (requiert le mot de passe)
+   */
+  async disableMfa(userId: string, password: string): Promise<void> {
+    const user = await User.findById(userId).select('+password');
+    if (!user) throw new Error('Utilisateur non trouvé');
+    if (!user.mfaEnabled) throw new Error('Le MFA n\'est pas activé');
+
+    const isPasswordValid = await user.comparePassword(password);
+    if (!isPasswordValid) throw new Error('Mot de passe incorrect');
+
+    user.mfaEnabled = false;
+    user.mfaSecret = undefined;
+    user.mfaBackupCodes = undefined;
+    await user.save({ validateBeforeSave: false });
+  }
+
+  /**
+   * Vérifie le code TOTP pendant le login et retourne les tokens d'accès.
+   * Accepte un code TOTP ou un code de secours.
+   */
+  async verifyMfa(
+    mfaToken: string,
+    code: string,
+    metadata?: { userAgent?: string; ipAddress?: string }
+  ): Promise<AuthResult> {
+    // Vérifier le token MFA temporaire
+    let payload: { userId: string; purpose: string };
+    try {
+      payload = jwt.verify(mfaToken, config.jwt.secret) as typeof payload;
+    } catch {
+      throw new Error('Token MFA expiré ou invalide');
+    }
+
+    if (payload.purpose !== 'mfa') {
+      throw new Error('Token invalide');
+    }
+
+    const user = await User.findById(payload.userId).select('+mfaSecret +mfaBackupCodes');
+    if (!user || !user.mfaEnabled || !user.mfaSecret) {
+      throw new Error('Utilisateur non trouvé ou MFA non activé');
+    }
+
+    // Tenter la vérification TOTP
+    const isTotpValid = this.verifyTotpToken(user.mfaSecret, code);
+
+    if (!isTotpValid) {
+      // Tenter un code de secours
+      const codeHash = crypto.createHash('sha256').update(code.toUpperCase()).digest('hex');
+      const backupIndex = user.mfaBackupCodes?.indexOf(codeHash) ?? -1;
+
+      if (backupIndex === -1) {
+        throw new Error('Code MFA invalide');
+      }
+
+      // Consommer le code de secours
+      user.mfaBackupCodes!.splice(backupIndex, 1);
+      await user.save({ validateBeforeSave: false });
+    }
+
+    // Mettre à jour la date de dernière connexion
+    user.lastLoginAt = new Date();
+    await user.save({ validateBeforeSave: false });
+
+    return this.generateAuthResult(user, metadata);
+  }
+
+  /**
+   * Vérifie un token TOTP avec une fenêtre de tolérance de +/- 1 période
+   */
+  private verifyTotpToken(secret: string, token: string): boolean {
+    const totp = new OTPAuth.TOTP({
+      issuer: MFA_ISSUER,
+      algorithm: 'SHA1',
+      digits: 6,
+      period: 30,
+      secret: OTPAuth.Secret.fromBase32(secret),
+    });
+
+    const delta = totp.validate({ token, window: 1 });
+    return delta !== null;
   }
 
   /**

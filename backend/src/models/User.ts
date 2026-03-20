@@ -112,9 +112,12 @@ export interface IUserDocument extends Document {
   passwordChangedAt?: Date;
   passwordResetToken?: string;
   passwordResetExpires?: Date;
+  mfaEnabled: boolean;
+  mfaSecret?: string;
+  mfaBackupCodes?: string[];
   createdAt: Date;
   updatedAt: Date;
-  
+
   // Méthodes d'instance
   comparePassword(candidatePassword: string): Promise<boolean>;
   hasPermission(permission: Permission): boolean;
@@ -190,6 +193,18 @@ const userSchema = new Schema<IUserDocument>(
       type: Date,
       select: false,
     },
+    mfaEnabled: {
+      type: Boolean,
+      default: false,
+    },
+    mfaSecret: {
+      type: String,
+      select: false,
+    },
+    mfaBackupCodes: {
+      type: [String],
+      select: false,
+    },
   },
   {
     timestamps: true,
@@ -200,6 +215,8 @@ const userSchema = new Schema<IUserDocument>(
         delete ret.password;
         delete ret.passwordResetToken;
         delete ret.passwordResetExpires;
+        delete ret.mfaSecret;
+        delete ret.mfaBackupCodes;
         delete ret.__v;
         return ret;
       },
