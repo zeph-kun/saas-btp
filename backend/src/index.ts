@@ -91,9 +91,9 @@ async function bootstrap(): Promise<void> {
 ║                                                            ║
 ║   SaaS BTP Telematics Server                               ║
 ║                                                            ║
-║   HTTP:      http://localhost:${config.port}                      ║
-║   WebSocket: ws://localhost:${config.port}                        ║
-║   Env:       ${config.nodeEnv.padEnd(15)}                         ║
+║   HTTP:      http://localhost:${config.port}                         ║
+║   WebSocket: ws://localhost:${config.port}                           ║
+║   Env:       ${config.nodeEnv.padEnd(15)}                               ║
 ║                                                            ║
 ╚════════════════════════════════════════════════════════════╝
     `);
