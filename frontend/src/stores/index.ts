@@ -298,21 +298,28 @@ export const useAlertStore = create<AlertState>((set, get) => ({
 
 interface GeofenceState {
   geofences: Geofence[];
+  selectedGeofence: Geofence | null;
   isLoading: boolean;
   error: string | null;
-  
-  fetchGeofences: () => Promise<void>;
+
+  fetchGeofences: (isActive?: boolean) => Promise<void>;
+  createGeofence: (data: Partial<Geofence>) => Promise<Geofence | null>;
+  updateGeofence: (id: string, data: Partial<Geofence>) => Promise<Geofence | null>;
+  deleteGeofence: (id: string) => Promise<boolean>;
+  setSelectedGeofence: (geofence: Geofence | null) => void;
+  clearError: () => void;
 }
 
-export const useGeofenceStore = create<GeofenceState>((set) => ({
+export const useGeofenceStore = create<GeofenceState>((set, get) => ({
   geofences: [],
+  selectedGeofence: null,
   isLoading: false,
   error: null,
 
-  fetchGeofences: async () => {
+  fetchGeofences: async (isActive?: boolean) => {
     set({ isLoading: true, error: null });
     try {
-      const response = await api.getGeofences(true);
+      const response = await api.getGeofences(isActive);
       if (response.success && response.data) {
         set({ geofences: response.data, isLoading: false });
       }
@@ -320,6 +327,63 @@ export const useGeofenceStore = create<GeofenceState>((set) => ({
       set({ error: 'Erreur lors du chargement des geofences', isLoading: false });
     }
   },
+
+  createGeofence: async (data) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await api.createGeofence(data);
+      if (response.success && response.data) {
+        const { geofences } = get();
+        set({ geofences: [...geofences, response.data], isLoading: false });
+        return response.data;
+      }
+      set({ isLoading: false });
+      return null;
+    } catch (error) {
+      set({ error: 'Erreur lors de la création de la geofence', isLoading: false });
+      return null;
+    }
+  },
+
+  updateGeofence: async (id, data) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await api.updateGeofence(id, data);
+      if (response.success && response.data) {
+        const { geofences } = get();
+        set({
+          geofences: geofences.map((g) => (g._id === id ? response.data! : g)),
+          isLoading: false,
+        });
+        return response.data;
+      }
+      set({ isLoading: false });
+      return null;
+    } catch (error) {
+      set({ error: 'Erreur lors de la mise à jour de la geofence', isLoading: false });
+      return null;
+    }
+  },
+
+  deleteGeofence: async (id) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await api.deleteGeofence(id);
+      if (response.success) {
+        const { geofences } = get();
+        set({ geofences: geofences.filter((g) => g._id !== id), isLoading: false });
+        return true;
+      }
+      set({ isLoading: false });
+      return false;
+    } catch (error) {
+      set({ error: 'Erreur lors de la suppression de la geofence', isLoading: false });
+      return false;
+    }
+  },
+
+  setSelectedGeofence: (geofence) => set({ selectedGeofence: geofence }),
+  clearError: () => set({ error: null }),
 }));
 
 // ============================================

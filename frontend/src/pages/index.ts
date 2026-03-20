@@ -9,3 +9,4 @@ export { UsersPage } from './UsersPage';
 export { VehiclesPage } from './VehiclesPage';
 export { ClientsPage } from './ClientsPage';
 export { ContractsPage } from './ContractsPage';
+export { GeofencesPage } from './GeofencesPage';

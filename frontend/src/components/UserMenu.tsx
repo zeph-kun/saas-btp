@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Truck, Users, FileText, UserCog } from 'lucide-react';
+import { Truck, Users, FileText, UserCog, MapPin } from 'lucide-react';
 import { useAuthStore } from '@/stores';
 import { Permission } from '@/types';
 
@@ -170,6 +170,17 @@ export function UserMenu() {
                 >
                   <FileText className="h-5 w-5 mr-3 text-gray-400" />
                   Contrats
+                </Link>
+              )}
+
+              {user.permissions.includes(Permission.GEOFENCES_READ) && (
+                <Link
+                  to="/geofences"
+                  onClick={() => setIsOpen(false)}
+                  className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                >
+                  <MapPin className="h-5 w-5 mr-3 text-gray-400" />
+                  Geofencing
                 </Link>
               )}
 

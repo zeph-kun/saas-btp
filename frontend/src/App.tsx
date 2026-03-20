@@ -12,6 +12,7 @@ import {
   VehiclesPage,
   ClientsPage,
   ContractsPage,
+  GeofencesPage,
 } from '@/pages';
 import { AlertNotificationProvider, ProtectedRoute } from '@/components';
 import { initializeWebSocket, useAuthStore } from '@/stores';
@@ -88,6 +89,14 @@ function AppRoutes() {
         element={
           <ProtectedRoute>
             <ContractsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/geofences"
+        element={
+          <ProtectedRoute>
+            <GeofencesPage />
           </ProtectedRoute>
         }
       />
