@@ -10,23 +10,49 @@ import { ApiResponse } from '../types/index.js';
 export class AuthController {
   /**
    * POST /api/auth/register
-   * Inscription d'un nouvel utilisateur
+   * Inscription d'un nouvel utilisateur.
+   *
+   * Deux cas :
+   * - Inscription publique (req.user absent) : l'utilisateur devient ADMIN de sa
+   *   propre organisation créée automatiquement par AuthService.
+   * - Inscription par invitation (req.user présent, ADMIN ou SUPER_ADMIN) :
+   *   le rôle fourni dans le body est utilisé ; l'organisation est celle du
+   *   demandeur sauf si `organizationId` est explicitement précisé.
    */
   async register(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const { email, password, firstName, lastName, organizationId, role } = req.body;
 
-      // Seuls les admins peuvent créer des utilisateurs avec un rôle spécifique
-      const userRole = req.user?.role === UserRole.ADMIN || req.user?.role === UserRole.SUPER_ADMIN
-        ? role
-        : UserRole.OPERATOR;
+      // Détermination du rôle :
+      // - Inscription publique (pas d'utilisateur connecté) → ADMIN (crée sa propre org)
+      // - Admin/Super-admin connecté → rôle fourni dans le body
+      // - Tout autre utilisateur connecté → OPERATOR (sécurité : pas d'élévation de privilège)
+      let userRole: UserRole;
+      if (!req.user) {
+        userRole = UserRole.ADMIN;
+      } else if (
+        req.user.role === UserRole.ADMIN ||
+        req.user.role === UserRole.SUPER_ADMIN
+      ) {
+        userRole = role ?? UserRole.OPERATOR;
+      } else {
+        userRole = UserRole.OPERATOR;
+      }
+
+      // Résolution de l'organisation :
+      // - Si explicitement fourni → on l'utilise
+      // - Sinon, si un admin est connecté → on prend son organisation
+      // - Sinon (inscription publique) → undefined → AuthService crée une nouvelle org
+      const resolvedOrganizationId: string | undefined =
+        organizationId ??
+        (req.user ? req.user.organizationId.toString() : undefined);
 
       const result = await authService.register({
         email,
         password,
         firstName,
         lastName,
-        organizationId: organizationId || req.user?.organizationId.toString(),
+        organizationId: resolvedOrganizationId,
         role: userRole,
       });
 
