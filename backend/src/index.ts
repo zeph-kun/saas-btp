@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import cookieParser from 'cookie-parser';
 import { createServer } from 'http';
 
 import config from './config/index.js';
@@ -33,9 +34,10 @@ async function bootstrap(): Promise<void> {
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Organization-Id', 'X-User-Id'],
   }));
   
-  // Parsing JSON
+  // Parsing JSON et cookies
   app.use(express.json({ limit: '10mb' }));
   app.use(express.urlencoded({ extended: true }));
+  app.use(cookieParser());
   
   // Logging des requêtes (sauf en test)
   if (config.nodeEnv !== 'test') {

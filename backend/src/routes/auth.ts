@@ -33,11 +33,8 @@ const loginSchema = z.object({
   }),
 });
 
-const refreshTokenSchema = z.object({
-  body: z.object({
-    refreshToken: z.string().min(1, 'Refresh token requis'),
-  }),
-});
+// Le refresh token est désormais lu depuis le cookie httpOnly,
+// plus besoin de validation dans le body.
 
 const forgotPasswordSchema = z.object({
   body: z.object({
@@ -86,8 +83,8 @@ const updateProfileSchema = z.object({
 // POST /api/auth/login - Connexion
 router.post('/login', validate(loginSchema), authController.login);
 
-// POST /api/auth/refresh - Rafraîchir les tokens
-router.post('/refresh', validate(refreshTokenSchema), authController.refreshToken);
+// POST /api/auth/refresh - Rafraîchir les tokens (refresh token dans le cookie httpOnly)
+router.post('/refresh', authController.refreshToken);
 
 // POST /api/auth/forgot-password - Demander un reset de mot de passe
 router.post('/forgot-password', validate(forgotPasswordSchema), authController.forgotPassword);

@@ -2,6 +2,28 @@ import { Request, Response, NextFunction } from 'express';
 import { authService } from '../services/AuthService.js';
 import { User, UserRole } from '../models/User.js';
 import { ApiResponse } from '../types/index.js';
+import config from '../config/index.js';
+
+const REFRESH_TOKEN_COOKIE = 'btp_refresh_token';
+const REFRESH_TOKEN_MAX_AGE = 7 * 24 * 60 * 60 * 1000; // 7 jours en ms
+
+const COOKIE_OPTIONS = {
+  httpOnly: true,
+  secure: config.nodeEnv === 'production',
+  sameSite: (config.nodeEnv === 'production' ? 'strict' : 'lax') as 'strict' | 'lax',
+  path: '/api/auth',
+};
+
+function setRefreshTokenCookie(res: Response, refreshToken: string): void {
+  res.cookie(REFRESH_TOKEN_COOKIE, refreshToken, {
+    ...COOKIE_OPTIONS,
+    maxAge: REFRESH_TOKEN_MAX_AGE,
+  });
+}
+
+function clearRefreshTokenCookie(res: Response): void {
+  res.clearCookie(REFRESH_TOKEN_COOKIE, COOKIE_OPTIONS);
+}
 
 /**
  * Contrôleur d'authentification
@@ -23,10 +45,6 @@ export class AuthController {
     try {
       const { email, password, firstName, lastName, organizationId, role } = req.body;
 
-      // Détermination du rôle :
-      // - Inscription publique (pas d'utilisateur connecté) → ADMIN (crée sa propre org)
-      // - Admin/Super-admin connecté → rôle fourni dans le body
-      // - Tout autre utilisateur connecté → OPERATOR (sécurité : pas d'élévation de privilège)
       let userRole: UserRole;
       if (!req.user) {
         userRole = UserRole.ADMIN;
@@ -39,10 +57,6 @@ export class AuthController {
         userRole = UserRole.OPERATOR;
       }
 
-      // Résolution de l'organisation :
-      // - Si explicitement fourni → on l'utilise
-      // - Sinon, si un admin est connecté → on prend son organisation
-      // - Sinon (inscription publique) → undefined → AuthService crée une nouvelle org
       const resolvedOrganizationId: string | undefined =
         organizationId ??
         (req.user ? req.user.organizationId.toString() : undefined);
@@ -56,12 +70,13 @@ export class AuthController {
         role: userRole,
       });
 
-      const response: ApiResponse<typeof result> = {
+      setRefreshTokenCookie(res, result.refreshToken);
+
+      const response: ApiResponse<{ user: typeof result.user; accessToken: string; expiresIn: number }> = {
         success: true,
         data: {
           user: result.user,
           accessToken: result.accessToken,
-          refreshToken: result.refreshToken,
           expiresIn: result.expiresIn,
         },
       };
@@ -87,19 +102,19 @@ export class AuthController {
 
       const result = await authService.login(email, password, metadata);
 
-      const response: ApiResponse<typeof result> = {
+      setRefreshTokenCookie(res, result.refreshToken);
+
+      const response: ApiResponse<{ user: typeof result.user; accessToken: string; expiresIn: number }> = {
         success: true,
         data: {
           user: result.user,
           accessToken: result.accessToken,
-          refreshToken: result.refreshToken,
           expiresIn: result.expiresIn,
         },
       };
 
       res.json(response);
     } catch (error) {
-      // Ne pas révéler de détails sur l'erreur (sécurité)
       res.status(401).json({
         success: false,
         error: {
@@ -112,11 +127,11 @@ export class AuthController {
 
   /**
    * POST /api/auth/refresh
-   * Rafraîchissement des tokens
+   * Rafraîchissement des tokens (refresh token lu depuis le cookie httpOnly)
    */
   async refreshToken(req: Request, res: Response, _next: NextFunction): Promise<void> {
     try {
-      const { refreshToken } = req.body;
+      const refreshToken = req.cookies?.[REFRESH_TOKEN_COOKIE];
 
       if (!refreshToken) {
         res.status(400).json({
@@ -136,18 +151,20 @@ export class AuthController {
 
       const result = await authService.refreshTokens(refreshToken, metadata);
 
-      const response: ApiResponse<typeof result> = {
+      setRefreshTokenCookie(res, result.refreshToken);
+
+      const response: ApiResponse<{ user: typeof result.user; accessToken: string; expiresIn: number }> = {
         success: true,
         data: {
           user: result.user,
           accessToken: result.accessToken,
-          refreshToken: result.refreshToken,
           expiresIn: result.expiresIn,
         },
       };
 
       res.json(response);
     } catch (error) {
+      clearRefreshTokenCookie(res);
       res.status(401).json({
         success: false,
         error: {
@@ -160,15 +177,17 @@ export class AuthController {
 
   /**
    * POST /api/auth/logout
-   * Déconnexion (révoque le refresh token)
+   * Déconnexion (révoque le refresh token depuis le cookie)
    */
   async logout(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { refreshToken } = req.body;
+      const refreshToken = req.cookies?.[REFRESH_TOKEN_COOKIE];
 
       if (refreshToken) {
         await authService.logout(refreshToken);
       }
+
+      clearRefreshTokenCookie(res);
 
       res.json({
         success: true,
@@ -198,6 +217,8 @@ export class AuthController {
 
       await authService.logoutAll(req.user._id.toString());
 
+      clearRefreshTokenCookie(res);
+
       res.json({
         success: true,
         data: { message: 'Toutes les sessions ont été fermées' },
@@ -215,23 +236,18 @@ export class AuthController {
     try {
       const { email } = req.body;
 
-      // Toujours retourner le même message (sécurité)
       const resetToken = await authService.forgotPassword(email);
 
-      // En production, envoyer le token par email
-      // Pour le dev, on le retourne dans la réponse
       console.log(`[Auth] Token de reset pour ${email}: ${resetToken}`);
 
       res.json({
         success: true,
         data: {
           message: 'Si cet email existe, un lien de réinitialisation a été envoyé',
-          // En dev uniquement :
           ...(process.env.NODE_ENV === 'development' && { resetToken }),
         },
       });
     } catch {
-      // Toujours retourner succès pour ne pas révéler si l'email existe
       res.json({
         success: true,
         data: {
@@ -374,8 +390,7 @@ export class AuthController {
       }
 
       const { firstName, lastName, email } = req.body;
-      
-      // Mettre à jour uniquement les champs autorisés
+
       const updates: Record<string, string> = {};
       if (firstName) updates.firstName = firstName;
       if (lastName) updates.lastName = lastName;

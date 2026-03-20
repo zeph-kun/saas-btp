@@ -22,6 +22,7 @@ class ApiClient {
       headers: {
         'Content-Type': 'application/json',
       },
+      withCredentials: true,
     });
 
     // Intercepteur pour ajouter le token d'authentification

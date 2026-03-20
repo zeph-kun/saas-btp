@@ -8,14 +8,14 @@ import {
   ChangePasswordRequest,
 } from '@/types';
 
-// Clés de stockage local
+// Clés de stockage local (seul l'access token et le user restent en localStorage)
 const ACCESS_TOKEN_KEY = 'btp_access_token';
-const REFRESH_TOKEN_KEY = 'btp_refresh_token';
 const USER_KEY = 'btp_user';
 
 /**
  * Service d'authentification
- * Gère les tokens, la connexion et la déconnexion
+ * Le refresh token est géré via un cookie httpOnly (non accessible en JS).
+ * Seuls l'access token et les infos user sont en localStorage.
  */
 class AuthService {
   private client: AxiosInstance;
@@ -27,6 +27,7 @@ class AuthService {
       headers: {
         'Content-Type': 'application/json',
       },
+      withCredentials: true, // Envoyer les cookies automatiquement
     });
   }
 
@@ -38,18 +39,12 @@ class AuthService {
     return localStorage.getItem(ACCESS_TOKEN_KEY);
   }
 
-  getRefreshToken(): string | null {
-    return localStorage.getItem(REFRESH_TOKEN_KEY);
-  }
-
-  setTokens(accessToken: string, refreshToken: string): void {
+  setAccessToken(accessToken: string): void {
     localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
-    localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
   }
 
   clearTokens(): void {
     localStorage.removeItem(ACCESS_TOKEN_KEY);
-    localStorage.removeItem(REFRESH_TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
   }
 
@@ -79,27 +74,27 @@ class AuthService {
 
   async login(credentials: LoginRequest): Promise<AuthResponse> {
     const { data } = await this.client.post<ApiResponse<AuthResponse>>('/login', credentials);
-    
+
     if (data.success && data.data) {
-      const { accessToken, refreshToken, user } = data.data;
-      this.setTokens(accessToken, refreshToken);
+      const { accessToken, user } = data.data;
+      this.setAccessToken(accessToken);
       this.setStoredUser(user);
       return data.data;
     }
-    
+
     throw new Error(data.error?.message || 'Erreur de connexion');
   }
 
   async register(userData: RegisterRequest): Promise<AuthResponse> {
     const { data } = await this.client.post<ApiResponse<AuthResponse>>('/register', userData);
-    
+
     if (data.success && data.data) {
-      const { accessToken, refreshToken, user } = data.data;
-      this.setTokens(accessToken, refreshToken);
+      const { accessToken, user } = data.data;
+      this.setAccessToken(accessToken);
       this.setStoredUser(user);
       return data.data;
     }
-    
+
     throw new Error(data.error?.message || 'Erreur lors de l\'inscription');
   }
 
@@ -109,17 +104,13 @@ class AuthService {
       return this.refreshPromise;
     }
 
-    const refreshToken = this.getRefreshToken();
-    if (!refreshToken) {
-      throw new Error('Pas de refresh token disponible');
-    }
-
+    // Le refresh token est envoyé automatiquement via le cookie httpOnly
     this.refreshPromise = this.client
-      .post<ApiResponse<AuthResponse>>('/refresh', { refreshToken })
+      .post<ApiResponse<AuthResponse>>('/refresh')
       .then(({ data }) => {
         if (data.success && data.data) {
-          const { accessToken, refreshToken: newRefreshToken, user } = data.data;
-          this.setTokens(accessToken, newRefreshToken);
+          const { accessToken, user } = data.data;
+          this.setAccessToken(accessToken);
           this.setStoredUser(user);
           return accessToken;
         }
@@ -137,12 +128,9 @@ class AuthService {
   }
 
   async logout(): Promise<void> {
-    const refreshToken = this.getRefreshToken();
-    
     try {
-      if (refreshToken) {
-        await this.client.post('/logout', { refreshToken });
-      }
+      // Le refresh token est envoyé via le cookie httpOnly
+      await this.client.post('/logout');
     } catch {
       // Ignorer les erreurs de logout
     } finally {
@@ -152,7 +140,7 @@ class AuthService {
 
   async logoutAll(): Promise<void> {
     const accessToken = this.getAccessToken();
-    
+
     try {
       await this.client.post('/logout-all', {}, {
         headers: { Authorization: `Bearer ${accessToken}` },
@@ -167,11 +155,11 @@ class AuthService {
       '/forgot-password',
       { email }
     );
-    
+
     if (data.success && data.data) {
       return data.data;
     }
-    
+
     throw new Error(data.error?.message || 'Erreur lors de la demande');
   }
 
@@ -180,7 +168,7 @@ class AuthService {
       '/reset-password',
       { token, password }
     );
-    
+
     if (!data.success) {
       throw new Error(data.error?.message || 'Erreur lors de la réinitialisation');
     }
@@ -188,13 +176,13 @@ class AuthService {
 
   async changePassword(passwords: ChangePasswordRequest): Promise<void> {
     const accessToken = this.getAccessToken();
-    
+
     const { data } = await this.client.post<ApiResponse<{ message: string }>>(
       '/change-password',
       passwords,
       { headers: { Authorization: `Bearer ${accessToken}` } }
     );
-    
+
     if (!data.success) {
       throw new Error(data.error?.message || 'Erreur lors du changement de mot de passe');
     }
@@ -202,31 +190,31 @@ class AuthService {
 
   async getProfile(): Promise<User> {
     const accessToken = this.getAccessToken();
-    
+
     const { data } = await this.client.get<ApiResponse<User>>('/me', {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
-    
+
     if (data.success && data.data) {
       this.setStoredUser(data.data);
       return data.data;
     }
-    
+
     throw new Error(data.error?.message || 'Erreur lors de la récupération du profil');
   }
 
   async updateProfile(updates: Partial<Pick<User, 'firstName' | 'lastName' | 'email'>>): Promise<User> {
     const accessToken = this.getAccessToken();
-    
+
     const { data } = await this.client.patch<ApiResponse<User>>('/me', updates, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
-    
+
     if (data.success && data.data) {
       this.setStoredUser(data.data);
       return data.data;
     }
-    
+
     throw new Error(data.error?.message || 'Erreur lors de la mise à jour du profil');
   }
 }
